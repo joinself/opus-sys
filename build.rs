@@ -164,7 +164,6 @@ fn main() {
 
     // generate the bindings for opus headers
     let bindings = bindgen::Builder::default()
-        .clang_arg("-Ivendor/")
         .clang_arg("-Ivendor/include/")
         .clang_arg("-Ivendor/celt/")
         .clang_arg("-Ivendor/silk/")
@@ -178,7 +177,7 @@ fn main() {
         .allowlist_var(r"opus.*")
         .allowlist_var(r"Opus.*")
         .allowlist_var(r"OPUS.*")
-        .header("opus.h")
+        .header("vendor/include/opus.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate opus bindings");
