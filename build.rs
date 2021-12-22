@@ -5,10 +5,17 @@ use std::path::Path;
 use std::path::PathBuf;
 
 fn main() {
+    let target = env::var("TARGET").unwrap();
+    let mut clang_flags = Vec::<String>::new();
+
     let opus_includes = Path::new("vendor/include/");
     let celt_includes = Path::new("vendor/celt/");
     let silk_includes = Path::new("vendor/silk/");
     let silk_fixed_includes = Path::new("vendor/silk/fixed/");
+
+    if target == "wasm32-unknown-emscripten" {
+        clang_flags.push(String::from("-fvisibility=default"));
+    }
 
     cc::Build::new()
         .warnings(false)
@@ -163,7 +170,13 @@ fn main() {
     println!("cargo:rerun-if-changed=opus.h");
 
     // generate the bindings for opus headers
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default();
+
+    for value in &clang_flags {
+        builder = builder.clang_arg(value);
+    }
+
+    let bindings = builder
         .clang_arg("-Ivendor/include/")
         .clang_arg("-Ivendor/celt/")
         .clang_arg("-Ivendor/silk/")

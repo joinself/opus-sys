@@ -20,7 +20,7 @@ mod tests {
         unsafe {
             let encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_AUDIO as i32, &mut error);
             assert_eq!(error, 0);
-            
+
             opus_encoder_ctl(encoder, 16000);
         }
     }
