@@ -167,8 +167,6 @@ fn main() {
         .file("vendor/src/repacketizer.c")
         .compile("opus");
 
-    println!("cargo:rerun-if-changed=opus.h");
-
     // generate the bindings for opus headers
     let mut builder = bindgen::Builder::default();
 
@@ -191,6 +189,7 @@ fn main() {
         .allowlist_var(r"Opus.*")
         .allowlist_var(r"OPUS.*")
         .header("vendor/include/opus.h")
+        .header("vendor/silk/fixed/main_FIX.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate opus bindings");
