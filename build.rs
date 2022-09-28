@@ -1,34 +1,101 @@
 extern crate bindgen;
 
+use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 
 fn main() {
     let target = env::var("TARGET").unwrap();
+
+    let mut defines = HashMap::<&str, &str>::new();
     let mut clang_flags = Vec::<String>::new();
 
+    let mut celt_sources = Vec::<&str>::new();
+    let mut silk_sources = Vec::<&str>::new();
+
+    let includes = Path::new("vendor/");
     let opus_includes = Path::new("vendor/include/");
     let celt_includes = Path::new("vendor/celt/");
     let silk_includes = Path::new("vendor/silk/");
     let silk_fixed_includes = Path::new("vendor/silk/fixed/");
 
-    if target == "wasm32-unknown-emscripten" {
+    defines.insert("USE_ALLOCA", "1");
+    defines.insert("FIXED_POINT", "1");
+    defines.insert("OPUS_BUILD", "1");
+    defines.insert("HAVE_LRINT", "1");
+    defines.insert("HAVE_LRINTF", "1");
+    defines.insert("LOCALE_NOT_USED", "1");
+
+    if target == "i686-linux-android" {
+    } else if target == "x86_64-apple-darwin" {
+    } else if target == "x86_64-apple-ios" {
+    } else if target == "x86_64-linux-android" {
+    } else if target == "x86_64-unknown-linux-gnu" {
+    } else if target == "armv7-linux-androideabi" {
+        defines.insert("OPUS_ARM_ASM", "1");
+        defines.insert("OPUS_ARM_INLINE_ASM", "1");
+        defines.insert("OPUS_ARM_MAY_HAVE_EDS", "1");
+        defines.insert("OPUS_ARM_PRESUME_EDSP", "1");
+        defines.insert("OPUS_ARM_INLINE_EDSP", "1");
+        defines.insert("OPUS_ARM_MAY_HAVE_MEDIA", "1");
+        defines.insert("OPUS_ARM_PRESUME_MEDIA", "1");
+        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
+        defines.insert("OPUS_HAVE_RTCD", "1");
+        // SIMD
+        defines.insert("OPUS_ARM_INLINE_NEON", "1");
+        celt_sources.push("vendor/celt/arm/armcpu.c");
+        celt_sources.push("vendor/celt/arm/arm_celt_map.c");
+        celt_sources.push("vendor/celt/arm/celt_neon_intr.c");
+        celt_sources.push("vendor/celt/arm/pitch_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/arm_silk_map.c");
+        silk_sources.push("vendor/silk/arm/biquad_alt_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/LPC_inv_pred_gain_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_del_dec_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_neon.c");
+        silk_sources.push("vendor/silk/fixed/arm/warped_autocorrelation_FIX_neon_intr.c");
+        clang_flags.push(String::from("-ffast-math"));
+        clang_flags.push(String::from("-funroll-loops"));
+    } else if target == "aarch64-apple-darwin" {
+    } else if target == "aarch64-apple-ios" {
+    } else if target == "aarch64-apple-ios-sim" {
+    } else if target == "aarch64-linux-android" {
+        defines.insert("OPUS_ARM_ASM", "1");
+        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
+        defines.insert("OPUS_HAVE_RTCD", "1");
+        // SIMD
+        defines.insert("OPUS_ARM_MAY_HAVE_NEON_INTR", "1");
+        defines.insert("OPUS_ARM_INLINE_NEON", "1");
+        defines.insert("OPUS_ARM_MAY_HAVE_MEDIA", "1");
+        defines.insert("OPUS_ARM_PRESUME_MEDIA", "1");
+        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
+        defines.insert("OPUS_ARM_PRESUME_AARCH64_NEON_INTR", "1");
+        celt_sources.push("vendor/celt/arm/armcpu.c");
+        celt_sources.push("vendor/celt/arm/arm_celt_map.c");
+        celt_sources.push("vendor/celt/arm/celt_neon_intr.c");
+        celt_sources.push("vendor/celt/arm/pitch_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/arm_silk_map.c");
+        silk_sources.push("vendor/silk/arm/biquad_alt_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/LPC_inv_pred_gain_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_del_dec_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_neon.c");
+        silk_sources.push("vendor/silk/fixed/arm/warped_autocorrelation_FIX_neon_intr.c");
+        clang_flags.push(String::from("-ffast-math"));
+        clang_flags.push(String::from("-funroll-loops"));
+    } else if target == "aarch64-unknown-linux-gnu" {
+    } else if target == "wasm32-unknown-emscripten" {
         clang_flags.push(String::from("-fvisibility=default"));
     }
 
-    cc::Build::new()
+    let mut celt_cmd = cc::Build::new();
+
+    celt_cmd
         .warnings(false)
+        .include(includes)
         .include(opus_includes)
         .include(celt_includes)
         .include(silk_includes)
         .include(silk_fixed_includes)
-        .define("USE_ALLOCA", "1")
-        .define("FIXED_POINT", "1")
-        .define("OPUS_BUILD", "1")
-        .define("HAVE_LRINT", "1")
-        .define("HAVE_LRINTF", "1")
-        .define("LOCALE_NOT_USED", "1")
         .file("vendor/celt/bands.c")
         .file("vendor/celt/celt.c")
         .file("vendor/celt/celt_decoder.c")
@@ -46,21 +113,27 @@ fn main() {
         .file("vendor/celt/pitch.c")
         .file("vendor/celt/quant_bands.c")
         .file("vendor/celt/rate.c")
-        .file("vendor/celt/vq.c")
-        .compile("celt");
+        .file("vendor/celt/vq.c");
 
-    cc::Build::new()
+    for source in &celt_sources {
+        celt_cmd.file(source);
+    }
+
+    for (key, value) in &defines {
+        celt_cmd.define(key, *value);
+    }
+
+    celt_cmd.compile("celt");
+
+    let mut silk_cmd = cc::Build::new();
+
+    silk_cmd
         .warnings(false)
+        .include(includes)
         .include(opus_includes)
         .include(celt_includes)
         .include(silk_includes)
         .include(silk_fixed_includes)
-        .define("USE_ALLOCA", "1")
-        .define("FIXED_POINT", "1")
-        .define("OPUS_BUILD", "1")
-        .define("HAVE_LRINT", "1")
-        .define("HAVE_LRINTF", "1")
-        .define("LOCALE_NOT_USED", "1")
         .file("vendor/silk/A2NLSF.c")
         .file("vendor/silk/ana_filt_bank_1.c")
         .file("vendor/silk/biquad_alt.c")
@@ -160,11 +233,23 @@ fn main() {
         .file("vendor/silk/fixed/schur64_FIX.c")
         .file("vendor/silk/fixed/schur_FIX.c")
         .file("vendor/silk/fixed/vector_ops_FIX.c")
-        .file("vendor/silk/fixed/warped_autocorrelation_FIX.c")
-        .compile("silk");
+        .file("vendor/silk/fixed/warped_autocorrelation_FIX.c");
 
-    cc::Build::new()
+    for (key, value) in &defines {
+        silk_cmd.define(key, *value);
+    }
+
+    for source in &silk_sources {
+        silk_cmd.file(source);
+    }
+
+    silk_cmd.compile("silk");
+
+    let mut opus_cmd = cc::Build::new();
+
+    opus_cmd
         .warnings(false)
+        .include(includes)
         .include(opus_includes)
         .include(celt_includes)
         .include(silk_includes)
@@ -187,8 +272,13 @@ fn main() {
         .file("vendor/src/opus_multistream_encoder.c")
         .file("vendor/src/opus_projection_decoder.c")
         .file("vendor/src/opus_projection_encoder.c")
-        .file("vendor/src/repacketizer.c")
-        .compile("opus");
+        .file("vendor/src/repacketizer.c");
+
+    for (key, value) in &defines {
+        opus_cmd.define(key, *value);
+    }
+
+    opus_cmd.compile("opus");
 
     // generate the bindings for opus headers
     let mut builder = bindgen::Builder::default();
@@ -198,6 +288,7 @@ fn main() {
     }
 
     let bindings = builder
+        .clang_arg("-Ivendor/")
         .clang_arg("-Ivendor/include/")
         .clang_arg("-Ivendor/celt/")
         .clang_arg("-Ivendor/silk/")
