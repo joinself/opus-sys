@@ -19,9 +19,9 @@ fn main() {
     let celt_includes = Path::new("vendor/celt/");
     let silk_includes = Path::new("vendor/silk/");
     let silk_fixed_includes = Path::new("vendor/silk/fixed/");
+    let silk_float_includes = Path::new("vendor/silk/float/");
 
     defines.insert("USE_ALLOCA", "1");
-    defines.insert("FIXED_POINT", "1");
     defines.insert("OPUS_BUILD", "1");
     defines.insert("HAVE_LRINT", "1");
     defines.insert("HAVE_LRINTF", "1");
@@ -35,15 +35,13 @@ fn main() {
     } else if target == "armv7-linux-androideabi" {
         defines.insert("OPUS_ARM_ASM", "1");
         defines.insert("OPUS_ARM_INLINE_ASM", "1");
-        defines.insert("OPUS_ARM_MAY_HAVE_EDS", "1");
-        defines.insert("OPUS_ARM_PRESUME_EDSP", "1");
         defines.insert("OPUS_ARM_INLINE_EDSP", "1");
+        defines.insert("OPUS_ARM_MAY_HAVE_EDSP", "1");
         defines.insert("OPUS_ARM_MAY_HAVE_MEDIA", "1");
-        defines.insert("OPUS_ARM_PRESUME_MEDIA", "1");
-        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
+        defines.insert("OPUS_ARM_MAY_HAVE_NEON", "1");
         defines.insert("OPUS_HAVE_RTCD", "1");
-        // SIMD
-        defines.insert("OPUS_ARM_INLINE_NEON", "1");
+
+        // celt_sources.push("vendor/celt/arm/celt_pitch_xcorr_arm_gnu.S");
         celt_sources.push("vendor/celt/arm/armcpu.c");
         celt_sources.push("vendor/celt/arm/arm_celt_map.c");
         celt_sources.push("vendor/celt/arm/celt_neon_intr.c");
@@ -53,7 +51,6 @@ fn main() {
         silk_sources.push("vendor/silk/arm/LPC_inv_pred_gain_neon_intr.c");
         silk_sources.push("vendor/silk/arm/NSQ_del_dec_neon_intr.c");
         silk_sources.push("vendor/silk/arm/NSQ_neon.c");
-        silk_sources.push("vendor/silk/fixed/arm/warped_autocorrelation_FIX_neon_intr.c");
         clang_flags.push(String::from("-ffast-math"));
         clang_flags.push(String::from("-funroll-loops"));
     } else if target == "aarch64-apple-darwin" {
@@ -61,15 +58,14 @@ fn main() {
     } else if target == "aarch64-apple-ios-sim" {
     } else if target == "aarch64-linux-android" {
         defines.insert("OPUS_ARM_ASM", "1");
-        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
-        defines.insert("OPUS_HAVE_RTCD", "1");
-        // SIMD
+        defines.insert("OPUS_ARM_MAY_HAVE_NEON", "1");
         defines.insert("OPUS_ARM_MAY_HAVE_NEON_INTR", "1");
-        defines.insert("OPUS_ARM_INLINE_NEON", "1");
-        defines.insert("OPUS_ARM_MAY_HAVE_MEDIA", "1");
-        defines.insert("OPUS_ARM_PRESUME_MEDIA", "1");
-        defines.insert("OPUS_ARM_INLINE_MEDIA", "1");
+        defines.insert("OPUS_ARM_PRESUME_NEON_INTR", "1");
         defines.insert("OPUS_ARM_PRESUME_AARCH64_NEON_INTR", "1");
+        defines.insert("OPUS_X86_PRESUME_AARCH64_NEON_INTR", "1");
+        defines.insert("OPUS_HAVE_RTCD", "1");
+
+        // celt_sources.push("vendor/celt/arm/celt_pitch_xcorr_arm_gnu.S");
         celt_sources.push("vendor/celt/arm/armcpu.c");
         celt_sources.push("vendor/celt/arm/arm_celt_map.c");
         celt_sources.push("vendor/celt/arm/celt_neon_intr.c");
@@ -79,7 +75,6 @@ fn main() {
         silk_sources.push("vendor/silk/arm/LPC_inv_pred_gain_neon_intr.c");
         silk_sources.push("vendor/silk/arm/NSQ_del_dec_neon_intr.c");
         silk_sources.push("vendor/silk/arm/NSQ_neon.c");
-        silk_sources.push("vendor/silk/fixed/arm/warped_autocorrelation_FIX_neon_intr.c");
         clang_flags.push(String::from("-ffast-math"));
         clang_flags.push(String::from("-funroll-loops"));
     } else if target == "aarch64-unknown-linux-gnu" {
@@ -96,6 +91,17 @@ fn main() {
         .include(celt_includes)
         .include(silk_includes)
         .include(silk_fixed_includes)
+        .include(silk_float_includes);
+
+    for source in &celt_sources {
+        celt_cmd.file(source);
+    }
+
+    for (key, value) in &defines {
+        celt_cmd.define(key, *value);
+    }
+
+    celt_cmd
         .file("vendor/celt/bands.c")
         .file("vendor/celt/celt.c")
         .file("vendor/celt/celt_decoder.c")
@@ -115,14 +121,6 @@ fn main() {
         .file("vendor/celt/rate.c")
         .file("vendor/celt/vq.c");
 
-    for source in &celt_sources {
-        celt_cmd.file(source);
-    }
-
-    for (key, value) in &defines {
-        celt_cmd.define(key, *value);
-    }
-
     celt_cmd.compile("celt");
 
     let mut silk_cmd = cc::Build::new();
@@ -134,6 +132,7 @@ fn main() {
         .include(celt_includes)
         .include(silk_includes)
         .include(silk_fixed_includes)
+        .include(silk_float_includes)
         .file("vendor/silk/A2NLSF.c")
         .file("vendor/silk/ana_filt_bank_1.c")
         .file("vendor/silk/biquad_alt.c")
@@ -211,29 +210,34 @@ fn main() {
         .file("vendor/silk/tables_pulses_per_block.c")
         .file("vendor/silk/VAD.c")
         .file("vendor/silk/VQ_WMat_EC.c")
-        .file("vendor/silk/fixed/apply_sine_window_FIX.c")
-        .file("vendor/silk/fixed/autocorr_FIX.c")
-        .file("vendor/silk/fixed/burg_modified_FIX.c")
-        .file("vendor/silk/fixed/corrMatrix_FIX.c")
-        .file("vendor/silk/fixed/encode_frame_FIX.c")
-        .file("vendor/silk/fixed/find_LPC_FIX.c")
-        .file("vendor/silk/fixed/find_LTP_FIX.c")
-        .file("vendor/silk/fixed/find_pitch_lags_FIX.c")
-        .file("vendor/silk/fixed/find_pred_coefs_FIX.c")
-        .file("vendor/silk/fixed/k2a_FIX.c")
-        .file("vendor/silk/fixed/k2a_Q16_FIX.c")
-        .file("vendor/silk/fixed/LTP_analysis_filter_FIX.c")
-        .file("vendor/silk/fixed/LTP_scale_ctrl_FIX.c")
-        .file("vendor/silk/fixed/noise_shape_analysis_FIX.c")
-        .file("vendor/silk/fixed/pitch_analysis_core_FIX.c")
-        .file("vendor/silk/fixed/process_gains_FIX.c")
-        .file("vendor/silk/fixed/regularize_correlations_FIX.c")
-        .file("vendor/silk/fixed/residual_energy16_FIX.c")
-        .file("vendor/silk/fixed/residual_energy_FIX.c")
-        .file("vendor/silk/fixed/schur64_FIX.c")
-        .file("vendor/silk/fixed/schur_FIX.c")
-        .file("vendor/silk/fixed/vector_ops_FIX.c")
-        .file("vendor/silk/fixed/warped_autocorrelation_FIX.c");
+        .file("vendor/silk/float/apply_sine_window_FLP.c")
+        .file("vendor/silk/float/corrMatrix_FLP.c")
+        .file("vendor/silk/float/encode_frame_FLP.c")
+        .file("vendor/silk/float/find_LPC_FLP.c")
+        .file("vendor/silk/float/find_LTP_FLP.c")
+        .file("vendor/silk/float/find_pitch_lags_FLP.c")
+        .file("vendor/silk/float/find_pred_coefs_FLP.c")
+        .file("vendor/silk/float/LPC_analysis_filter_FLP.c")
+        .file("vendor/silk/float/LTP_analysis_filter_FLP.c")
+        .file("vendor/silk/float/LTP_scale_ctrl_FLP.c")
+        .file("vendor/silk/float/noise_shape_analysis_FLP.c")
+        .file("vendor/silk/float/process_gains_FLP.c")
+        .file("vendor/silk/float/regularize_correlations_FLP.c")
+        .file("vendor/silk/float/residual_energy_FLP.c")
+        .file("vendor/silk/float/warped_autocorrelation_FLP.c")
+        .file("vendor/silk/float/wrappers_FLP.c")
+        .file("vendor/silk/float/autocorrelation_FLP.c")
+        .file("vendor/silk/float/burg_modified_FLP.c")
+        .file("vendor/silk/float/bwexpander_FLP.c")
+        .file("vendor/silk/float/energy_FLP.c")
+        .file("vendor/silk/float/inner_product_FLP.c")
+        .file("vendor/silk/float/k2a_FLP.c")
+        .file("vendor/silk/float/LPC_inv_pred_gain_FLP.c")
+        .file("vendor/silk/float/pitch_analysis_core_FLP.c")
+        .file("vendor/silk/float/scale_copy_vector_FLP.c")
+        .file("vendor/silk/float/scale_vector_FLP.c")
+        .file("vendor/silk/float/schur_FLP.c")
+        .file("vendor/silk/float/sort_FLP.c");
 
     for (key, value) in &defines {
         silk_cmd.define(key, *value);
@@ -254,8 +258,8 @@ fn main() {
         .include(celt_includes)
         .include(silk_includes)
         .include(silk_fixed_includes)
+        .include(silk_float_includes)
         .define("USE_ALLOCA", "1")
-        .define("FIXED_POINT", "1")
         .define("OPUS_BUILD", "1")
         .define("HAVE_LRINT", "1")
         .define("HAVE_LRINTF", "1")
