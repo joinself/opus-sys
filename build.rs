@@ -53,9 +53,22 @@ fn main() {
         silk_sources.push("vendor/silk/arm/NSQ_neon.c");
         clang_flags.push(String::from("-ffast-math"));
         clang_flags.push(String::from("-funroll-loops"));
-    } else if target == "aarch64-apple-darwin" {
-    } else if target == "aarch64-apple-ios" {
-    } else if target == "aarch64-apple-ios-sim" {
+    } else if target == "aarch64-apple-darwin" || target == "aarch64-apple-ios"|| target == "aarch64-apple-ios-sim" {
+        defines.insert("OPUS_ARM_MAY_HAVE_NEON_INTR", "1");
+        defines.insert("OPUS_ARM_PRESUME_AARCH64_NEON_INTR", "1");
+        defines.insert("OPUS_ARM_PRESUME_NEON_INTR", "1");
+
+        celt_sources.push("vendor/celt/arm/armcpu.c");
+        celt_sources.push("vendor/celt/arm/arm_celt_map.c");
+        celt_sources.push("vendor/celt/arm/celt_neon_intr.c");
+        celt_sources.push("vendor/celt/arm/pitch_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/arm_silk_map.c");
+        silk_sources.push("vendor/silk/arm/biquad_alt_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/LPC_inv_pred_gain_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_del_dec_neon_intr.c");
+        silk_sources.push("vendor/silk/arm/NSQ_neon.c");
+        clang_flags.push(String::from("-ffast-math"));
+        clang_flags.push(String::from("-funroll-loops"));
     } else if target == "aarch64-linux-android" {
         defines.insert("OPUS_ARM_ASM", "1");
         defines.insert("OPUS_ARM_MAY_HAVE_NEON", "1");
