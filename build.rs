@@ -53,7 +53,10 @@ fn main() {
         silk_sources.push("vendor/silk/arm/NSQ_neon.c");
         clang_flags.push(String::from("-ffast-math"));
         clang_flags.push(String::from("-funroll-loops"));
-    } else if target == "aarch64-apple-darwin" || target == "aarch64-apple-ios"|| target == "aarch64-apple-ios-sim" {
+    } else if target == "aarch64-apple-darwin"
+        || target == "aarch64-apple-ios"
+        || target == "aarch64-apple-ios-sim"
+    {
         defines.insert("OPUS_ARM_MAY_HAVE_NEON_INTR", "1");
         defines.insert("OPUS_ARM_PRESUME_AARCH64_NEON_INTR", "1");
         defines.insert("OPUS_ARM_PRESUME_NEON_INTR", "1");
@@ -320,7 +323,7 @@ fn main() {
         .allowlist_var(r"Opus.*")
         .allowlist_var(r"OPUS.*")
         .header("vendor/include/opus.h")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate opus bindings");
 
